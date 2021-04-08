@@ -34,10 +34,10 @@ func workloadGenerator(c net.Conn) {
 		sender.UnicastSend(c, d)
 
 		receiver.UnicastReceive(c, &d)
-		if d.Ack == 0 {
-			fmt.Println("Key:", d.Key, "not found.")
-		} else {
+		if d.Ack == 1 {
 			fmt.Println("Value:", d.Value)
+		} else {
+			fmt.Println("Key:", d.Key, "not found.")
 		}
 	}
 	write := func(key string, value string) {
