@@ -27,7 +27,7 @@ func printInterface() {
 }
 
 func workloadGenerator(c net.Conn) {
-	reading := func(key string) {
+	read := func(key string) {
 		d := data.Data{}
 		d.Key = key
 		d.ReadOrWrite = 0
@@ -40,7 +40,7 @@ func workloadGenerator(c net.Conn) {
 			fmt.Println("Value:", d.Value)
 		}
 	}
-	writing := func(key string, value string) {
+	write := func(key string, value string) {
 		d := data.Data{}
 		// populates Data struct
 		d.Key = key
@@ -71,10 +71,10 @@ func workloadGenerator(c net.Conn) {
 		switch option {
 		case 0:
 			fmt.Println("--------Round", i, ": Reading", "----------")
-			reading(key)
+			read(key)
 		case 1:
 			fmt.Println("--------Round", i, ": Writing", "----------")
-			writing(key, value)
+			write(key, value)
 		default:
 			fmt.Println("Unreachable")
 		}
@@ -84,13 +84,13 @@ func workloadGenerator(c net.Conn) {
 
 func main() {
 
-	// reads YAML file and extract information
+	// reads YAML file and extracts information
 	yaml, err := config.ReadConf("config.yaml")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// dials the appropriate server
+	// dials the appropriate server: currently random
 	rand.Seed(time.Now().UnixNano())
 	toDial := rand.Intn(yaml.NumServers - 0)
 	IP := yaml.Servers[toDial].IP
@@ -102,7 +102,7 @@ func main() {
 		return
 	}
 
-	// infinite loop until user exits
+	// keeps on running until user exits
 	for {
 		printInterface()
 
@@ -112,27 +112,34 @@ func main() {
 		input = strings.TrimSuffix(input, "\n")
 
 		switch input {
+
 		case "1": //reading
 			d := data.Data{}
+
 			fmt.Print("Enter Key: ")
 			key, _ := reader.ReadString('\n')
 			key = strings.TrimSuffix(key, "\n")
+
 			d.Key = key
 			d.ReadOrWrite = 0
+
 			sender.UnicastSend(c, d)
 			fmt.Println("Key sent")
 
 			receiver.UnicastReceive(c, &d)
-			if d.Ack == 0 {
-				fmt.Println("Key not found")
-			} else {
+			if d.Ack == 1 {
 				fmt.Println("Value:", d.Value)
+			} else {
+				fmt.Println("Key not found")
 			}
+
 		case "2": //writing
 			d := data.Data{}
+
 			fmt.Print("Enter Key: ")
 			key, _ := reader.ReadString('\n')
 			key = strings.TrimSuffix(key, "\n")
+
 			fmt.Print("Enter Value: ")
 			value, _ := reader.ReadString('\n')
 			value = strings.TrimSuffix(value, "\n")
@@ -154,12 +161,16 @@ func main() {
 			} else {
 				fmt.Println("Not Written")
 			}
+
 		case "3":
-			fmt.Println("--------Starting Generator----------")
+			fmt.Println("----------Starting Generator----------")
 			workloadGenerator(c)
-			fmt.Println("----------Generator Complete--------")
+			fmt.Println("----------Generator Complete----------")
+
 		case "4":
+			fmt.Println("Bye, bye!")
 			os.Exit(1)
+
 		default:
 			fmt.Println("Invalid input. Try again!")
 		}

@@ -5,6 +5,7 @@ import (
 	"LeaderlessReplication/data"
 	"LeaderlessReplication/receiver"
 	"LeaderlessReplication/sender"
+	"sync"
 
 	"fmt"
 	"log"
@@ -14,9 +15,21 @@ import (
 	"strings"
 )
 
-var storage []data.Data // global data storage
+// Storage is a global data storage that stores key-value pairs with its timestamp
+type Storage struct {
+	mu sync.Mutex
+	s  []data.Data
+}
+
+// AckArray is a gloabl data array that is used to perform most recent read and write calculations
+type AckArray struct {
+	mu sync.Mutex
+	a  []data.Data
+}
+
+var storage Storage
+var ackArray AckArray
 var allowedFailures int // N - f
-var ackArray []data.Data
 var useDisk bool
 
 func printServers(nodes map[string]net.Conn) {
@@ -34,22 +47,9 @@ func sendToOtherServers(d data.Data, nodes map[string]net.Conn) {
 	}
 }
 
-/*func countAcks(nodes map[string]net.Conn) []data.Data {
-	var ackArray []data.Data
-	for id, c := range nodes {
-		ack := data.Data{}
-		receiver.UnicastReceive(c, &ack)
-		if ack.Ack == 1 {
-			fmt.Println("Received ACK from Server: ", id)
-			ackArray = append(ackArray, ack)
-		}
-	}
-	return ackArray
-}*/
-
 func serve(c net.Conn, nodes map[string]net.Conn) {
 	for {
-		ackArray = nil
+		ackArray.a = nil
 		d := data.Data{}
 		receiver.UnicastReceive(c, &d)
 		switch d.ReadOrWrite {
@@ -59,18 +59,20 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 
 			// waits for N - f acks
 			// adds the current server's key-value pair to compare
-			index := contains(storage, d.Key)
+			index := contains(storage.s, d.Key)
 			if index >= 0 {
-				ackArray = append(ackArray, storage[index])
+				ackArray.mu.Lock()
+				ackArray.a = append(ackArray.a, storage.s[index])
+				ackArray.mu.Unlock()
 			}
 
-			for len(ackArray) < allowedFailures-1 {
+			for len(ackArray.a) < allowedFailures-1 {
 			}
 
 			var counter int
 
-			for i := range ackArray {
-				if ackArray[i].Exists == 1 {
+			for i := range ackArray.a {
+				if ackArray.a[i].Exists == 1 {
 					counter += 1
 				}
 			}
@@ -83,13 +85,13 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 			}
 
 			// check timestamp
-			d = ackArray[0]
-			t := ackArray[0].Timestamp
-			for i := range ackArray {
-				newtime := ackArray[i].Timestamp
+			d = ackArray.a[0]
+			t := ackArray.a[0].Timestamp
+			for i := range ackArray.a {
+				newtime := ackArray.a[i].Timestamp
 				if newtime.After(t) {
 					// get most recent key value pair
-					d = ackArray[i]
+					d = ackArray.a[i]
 				}
 			}
 			// send it back to the client
@@ -98,21 +100,25 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 
 		case 1: //client is writing
 			// write to this server
-			index := contains(storage, d.Key)
+			index := contains(storage.s, d.Key)
 			if index >= 0 {
-				storage[index] = d
+				storage.mu.Lock()
+				storage.s[index] = d
+				storage.mu.Unlock()
 			} else {
-				storage = append(storage, d)
+				storage.mu.Lock()
+				storage.s = append(storage.s, d)
+				storage.mu.Unlock()
 			}
 			// send all the other servers that we want to write this key-value pair
 			sendToOtherServers(d, nodes)
 
 			// waits for N - f acks
 
-			for len(ackArray) < allowedFailures-1 {
+			for len(ackArray.a) < allowedFailures-1 {
 			}
 
-			if len(ackArray)+1 < allowedFailures {
+			if len(ackArray.a)+1 < allowedFailures {
 				d.Ack = 0
 			} else {
 				d.Ack = 1
@@ -142,7 +148,9 @@ func listenToOtherServers(c net.Conn) {
 
 		if d.Ack == 1 {
 			d.ReadOrWrite = -1
-			ackArray = append(ackArray, d)
+			ackArray.mu.Lock()
+			ackArray.a = append(ackArray.a, d)
+			ackArray.mu.Unlock()
 			continue
 		}
 
@@ -150,7 +158,7 @@ func listenToOtherServers(c net.Conn) {
 		case 0: // reading
 			//check if you have k,v pair in storage
 			//if you have it, send it back
-			if contains(storage, d.Key) >= 0 {
+			if contains(storage.s, d.Key) >= 0 {
 				d.ReadOrWrite = -1
 				d.Ack = 1
 				d.Exists = 1
@@ -164,11 +172,15 @@ func listenToOtherServers(c net.Conn) {
 			}
 
 		case 1: // writing
-			index := contains(storage, d.Key)
+			index := contains(storage.s, d.Key)
 			if index >= 0 {
-				storage[index] = d
+				storage.mu.Lock()
+				storage.s[index] = d
+				storage.mu.Unlock()
 			} else {
-				storage = append(storage, d)
+				storage.mu.Lock()
+				storage.s = append(storage.s, d)
+				storage.mu.Unlock()
 			}
 			// fmt.Println(storage)
 			d.ReadOrWrite = -1
