@@ -16,9 +16,9 @@ import (
 	"time"
 )
 
-// printInterface
+// printInterface shows the user all the available options they can execute
 func printInterface() {
-	fmt.Println("What would you like to do?")
+	fmt.Println("------TsengchroDB------")
 	fmt.Println("1. Read from the server")
 	fmt.Println("2. Write to the server")
 	fmt.Println("3. Workload Generator")
@@ -37,9 +37,11 @@ func workloadGenerator(c net.Conn) {
 		if d.Ack == 1 {
 			fmt.Println("Value:", d.Value)
 		} else {
+			fmt.Println("ACK:", d.Ack)
 			fmt.Println("Key:", d.Key, "not found.")
 		}
 	}
+
 	write := func(key string, value string) {
 		d := data.Data{}
 		// populates Data struct
@@ -68,22 +70,20 @@ func workloadGenerator(c net.Conn) {
 
 		key := strconv.Itoa(i)
 		value := strconv.Itoa(i)
+
 		switch option {
 		case 0:
 			fmt.Println("--------Round", i, ": Reading", "----------")
 			read(key)
-		case 1:
+		default:
 			fmt.Println("--------Round", i, ": Writing", "----------")
 			write(key, value)
-		default:
-			fmt.Println("Unreachable")
 		}
 	}
 
 }
 
 func main() {
-
 	// reads YAML file and extracts information
 	yaml, err := config.ReadConf("config.yaml")
 	if err != nil {

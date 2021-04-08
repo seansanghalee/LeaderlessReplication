@@ -5,11 +5,7 @@ import (
 	"LeaderlessReplication/data"
 	"LeaderlessReplication/receiver"
 	"LeaderlessReplication/sender"
-<<<<<<< HEAD
-	"sync"
-=======
 	"LeaderlessReplication/utils"
->>>>>>> d54a1c89fd08ac664a0c82c3a767adeb7f9e76ed
 
 	"fmt"
 	"log"
@@ -17,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Storage is a global data storage that stores key-value pairs with its timestamp
@@ -64,13 +61,12 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 
 			// waits for N - f acks
 			// adds the current server's key-value pair to compare
-<<<<<<< HEAD
 			index := contains(storage.s, d.Key)
 			if index >= 0 {
 				ackArray.mu.Lock()
 				ackArray.a = append(ackArray.a, storage.s[index])
 				ackArray.mu.Unlock()
-=======
+			}
 
 			if useDisk {
 				hasKey, returnedValue := utils.ReadFromFile(serverID, d.Key)
@@ -82,8 +78,8 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 				if index >= 0 {
 					ackArray = append(ackArray, storage[index])
 				}
->>>>>>> d54a1c89fd08ac664a0c82c3a767adeb7f9e76ed
 			}
+			
 
 			for len(ackArray.a) < allowedFailures-1 {
 			}
@@ -119,7 +115,6 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 
 		case 1: //client is writing
 			// write to this server
-<<<<<<< HEAD
 			index := contains(storage.s, d.Key)
 			if index >= 0 {
 				storage.mu.Lock()
@@ -129,7 +124,6 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 				storage.mu.Lock()
 				storage.s = append(storage.s, d)
 				storage.mu.Unlock()
-=======
 			if useDisk {
 				utils.WriteToFile(serverID, d)
 			} else {
@@ -139,8 +133,8 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 				} else {
 					storage = append(storage, d)
 				}
->>>>>>> d54a1c89fd08ac664a0c82c3a767adeb7f9e76ed
 			}
+		}
 
 			// send all the other servers that we want to write this key-value pair
 			sendToOtherServers(d, nodes)

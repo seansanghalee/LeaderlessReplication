@@ -24,8 +24,6 @@ func Dial(i int, ID int, IP string, port string, nodes map[string]net.Conn) {
 	fmt.Println("Sent", ID)
 	fmt.Println("Added", i)
 	nodes[strconv.Itoa(i)] = c
-
-	// fmt.Println(nodes)
 }
 
 // UnicastSend sends a message to other process via TCP channel
