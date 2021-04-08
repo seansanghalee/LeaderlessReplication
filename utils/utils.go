@@ -13,8 +13,6 @@ import (
 	"strings"
 )
 
-//NOTE TO SELF: When the key/values are integers, the regex works weirdly
-
 func WriteToFile(server string, data data.Data) {
 
 	f, err := os.OpenFile(server+".txt", os.O_APPEND|os.O_WRONLY, 0600)
@@ -68,7 +66,7 @@ func ReadFromFile(server string, key string) (keyFound bool, value data.Data) {
 	lines := strings.Split(string(input), "\n")
 
 	for _, line := range lines {
-		if strings.Contains(line, key) {
+		if strings.Contains(line, key+":") {
 			key := strings.Split(line, ":")[0]
 			value := strings.Split(line, ":")[1]
 			timestamp := strings.Split(line, ":")[2]
