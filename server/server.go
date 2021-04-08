@@ -5,7 +5,11 @@ import (
 	"LeaderlessReplication/data"
 	"LeaderlessReplication/receiver"
 	"LeaderlessReplication/sender"
+<<<<<<< HEAD
 	"sync"
+=======
+	"LeaderlessReplication/utils"
+>>>>>>> d54a1c89fd08ac664a0c82c3a767adeb7f9e76ed
 
 	"fmt"
 	"log"
@@ -31,6 +35,7 @@ var storage Storage
 var ackArray AckArray
 var allowedFailures int // N - f
 var useDisk bool
+var serverID string
 
 func printServers(nodes map[string]net.Conn) {
 	fmt.Println("Connected Servers:", len(nodes))
@@ -59,11 +64,25 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 
 			// waits for N - f acks
 			// adds the current server's key-value pair to compare
+<<<<<<< HEAD
 			index := contains(storage.s, d.Key)
 			if index >= 0 {
 				ackArray.mu.Lock()
 				ackArray.a = append(ackArray.a, storage.s[index])
 				ackArray.mu.Unlock()
+=======
+
+			if useDisk {
+				hasKey, returnedValue := utils.ReadFromFile(serverID, d.Key)
+				if hasKey {
+					ackArray = append(ackArray, returnedValue)
+				}
+			} else {
+				index := contains(storage, d.Key)
+				if index >= 0 {
+					ackArray = append(ackArray, storage[index])
+				}
+>>>>>>> d54a1c89fd08ac664a0c82c3a767adeb7f9e76ed
 			}
 
 			for len(ackArray.a) < allowedFailures-1 {
@@ -100,6 +119,7 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 
 		case 1: //client is writing
 			// write to this server
+<<<<<<< HEAD
 			index := contains(storage.s, d.Key)
 			if index >= 0 {
 				storage.mu.Lock()
@@ -109,7 +129,19 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 				storage.mu.Lock()
 				storage.s = append(storage.s, d)
 				storage.mu.Unlock()
+=======
+			if useDisk {
+				utils.WriteToFile(serverID, d)
+			} else {
+				index := contains(storage, d.Key)
+				if index >= 0 {
+					storage[index] = d
+				} else {
+					storage = append(storage, d)
+				}
+>>>>>>> d54a1c89fd08ac664a0c82c3a767adeb7f9e76ed
 			}
+
 			// send all the other servers that we want to write this key-value pair
 			sendToOtherServers(d, nodes)
 
@@ -158,7 +190,17 @@ func listenToOtherServers(c net.Conn) {
 		case 0: // reading
 			//check if you have k,v pair in storage
 			//if you have it, send it back
+<<<<<<< HEAD
 			if contains(storage.s, d.Key) >= 0 {
+=======
+			var fileContainsKey bool
+
+			if useDisk {
+				fileContainsKey, _ = utils.ReadFromFile(serverID, d.Key)
+			}
+
+			if contains(storage, d.Key) >= 0 || fileContainsKey {
+>>>>>>> d54a1c89fd08ac664a0c82c3a767adeb7f9e76ed
 				d.ReadOrWrite = -1
 				d.Ack = 1
 				d.Exists = 1
@@ -172,6 +214,7 @@ func listenToOtherServers(c net.Conn) {
 			}
 
 		case 1: // writing
+<<<<<<< HEAD
 			index := contains(storage.s, d.Key)
 			if index >= 0 {
 				storage.mu.Lock()
@@ -181,6 +224,17 @@ func listenToOtherServers(c net.Conn) {
 				storage.mu.Lock()
 				storage.s = append(storage.s, d)
 				storage.mu.Unlock()
+=======
+			if useDisk {
+				utils.WriteToFile(serverID, d)
+			} else {
+				index := contains(storage, d.Key)
+				if index >= 0 {
+					storage[index] = d
+				} else {
+					storage = append(storage, d)
+				}
+>>>>>>> d54a1c89fd08ac664a0c82c3a767adeb7f9e76ed
 			}
 			// fmt.Println(storage)
 			d.ReadOrWrite = -1
@@ -206,12 +260,13 @@ func main() {
 	}
 
 	ID, _ := strconv.Atoi(arguments[1])
+	serverID = string(arguments[1])
 
 	if strings.Contains(arguments[2], "disk") {
 		useDisk = true
 
 		// For Testing:
-		// utils.WriteToFile(string(arguments[1]), "sup", "peace")
+		// utils.WriteToFile(string(arguments[1]), data.Data{Key: "key", Value: "value", Timestamp: time.Now()})
 		// utils.ReadFromFile(string(arguments[1]), "sup")
 	} else {
 		useDisk = false
