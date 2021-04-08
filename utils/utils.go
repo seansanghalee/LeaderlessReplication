@@ -13,9 +13,11 @@ import (
 	"strings"
 )
 
+//NOTE TO SELF: When the key/values are integers, the regex works weirdly
+
 func WriteToFile(server string, data data.Data) {
 
-	f, err := os.OpenFile("0.txt", os.O_APPEND|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(server+".txt", os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		//no current file
 		mydata := []byte(data.Key + ":" + data.Value + ":" + data.Timestamp.String() + ":" + strconv.Itoa(data.Ack) + ":" + strconv.Itoa(data.Exists) + ":" + strconv.Itoa(data.ReadOrWrite) + "\n")
@@ -34,7 +36,6 @@ func WriteToFile(server string, data data.Data) {
 
 		if found {
 			//delete current line with value associated with key
-			//regex to find the key
 			re := regexp.MustCompile("(?m)^.*" + data.Key + ".*$[\r\n]+")
 			result := re.ReplaceAllString(string(file), "")
 

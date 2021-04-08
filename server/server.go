@@ -20,6 +20,7 @@ var storage []data.Data // global data storage
 var allowedFailures int // N - f
 var ackArray []data.Data
 var useDisk bool
+var serverID string
 
 func printServers(nodes map[string]net.Conn) {
 	fmt.Println("Connected Servers:", len(nodes))
@@ -61,9 +62,17 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 
 			// waits for N - f acks
 			// adds the current server's key-value pair to compare
-			index := contains(storage, d.Key)
-			if index >= 0 {
-				ackArray = append(ackArray, storage[index])
+
+			if useDisk {
+				hasKey, returnedValue := utils.ReadFromFile(serverID, d.Key)
+				if hasKey {
+					ackArray = append(ackArray, returnedValue)
+				}
+			} else {
+				index := contains(storage, d.Key)
+				if index >= 0 {
+					ackArray = append(ackArray, storage[index])
+				}
 			}
 
 			for len(ackArray) < allowedFailures-1 {
@@ -100,12 +109,17 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 
 		case 1: //client is writing
 			// write to this server
-			index := contains(storage, d.Key)
-			if index >= 0 {
-				storage[index] = d
+			if useDisk {
+				utils.WriteToFile(serverID, d)
 			} else {
-				storage = append(storage, d)
+				index := contains(storage, d.Key)
+				if index >= 0 {
+					storage[index] = d
+				} else {
+					storage = append(storage, d)
+				}
 			}
+
 			// send all the other servers that we want to write this key-value pair
 			sendToOtherServers(d, nodes)
 
@@ -152,7 +166,13 @@ func listenToOtherServers(c net.Conn) {
 		case 0: // reading
 			//check if you have k,v pair in storage
 			//if you have it, send it back
-			if contains(storage, d.Key) >= 0 {
+			var fileContainsKey bool
+
+			if useDisk {
+				fileContainsKey, _ = utils.ReadFromFile(serverID, d.Key)
+			}
+
+			if contains(storage, d.Key) >= 0 || fileContainsKey {
 				d.ReadOrWrite = -1
 				d.Ack = 1
 				d.Exists = 1
@@ -166,11 +186,15 @@ func listenToOtherServers(c net.Conn) {
 			}
 
 		case 1: // writing
-			index := contains(storage, d.Key)
-			if index >= 0 {
-				storage[index] = d
+			if useDisk {
+				utils.WriteToFile(serverID, d)
 			} else {
-				storage = append(storage, d)
+				index := contains(storage, d.Key)
+				if index >= 0 {
+					storage[index] = d
+				} else {
+					storage = append(storage, d)
+				}
 			}
 			// fmt.Println(storage)
 			d.ReadOrWrite = -1
@@ -196,12 +220,13 @@ func main() {
 	}
 
 	ID, _ := strconv.Atoi(arguments[1])
+	serverID = string(arguments[1])
 
 	if strings.Contains(arguments[2], "disk") {
 		useDisk = true
 
 		// For Testing:
-		// utils.WriteToFile(string(arguments[1]), data.Data{Key: "sup", Value: "bye", Timestamp: time.Now()})
+		utils.WriteToFile(string(arguments[1]), data.Data{Key: "key", Value: "value", Timestamp: time.Now()})
 		// utils.ReadFromFile(string(arguments[1]), "sup")
 	} else {
 		useDisk = false
