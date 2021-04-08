@@ -5,12 +5,19 @@ import (
 	"LeaderlessReplication/data"
 	"LeaderlessReplication/receiver"
 	"LeaderlessReplication/sender"
+
 	"fmt"
 	"log"
 	"net"
 	"os"
 	"strconv"
+	"strings"
 )
+
+var storage []data.Data // global data storage
+var allowedFailures int // N - f
+var ackArray []data.Data
+var useDisk bool
 
 func printServers(nodes map[string]net.Conn) {
 	fmt.Println("Connected Servers:", len(nodes))
@@ -175,26 +182,28 @@ func listenToOtherServers(c net.Conn) {
 	}
 }
 
-// global data storage
-var storage []data.Data
-
-// N - f
-var allowedFailures int
-
-var ackArray []data.Data
-
 func main() {
-
-	// takes in the command argument and identify the ID and the port number
-	arguments := os.Args
+	arguments := os.Args // takes in the command argument and identify the ID and the port number
 
 	// checks if host address and port # are provided
 	if len(arguments) == 1 {
 		fmt.Println("Please provide port")
 		return
+	} else if len(arguments) == 2 {
+		fmt.Println("Please provide disk flag")
 	}
 
 	ID, _ := strconv.Atoi(arguments[1])
+
+	if strings.Contains(arguments[2], "disk") {
+		useDisk = true
+
+		// For Testing:
+		// utils.WriteToFile(string(arguments[1]), "sup", "peace")
+		// utils.ReadFromFile(string(arguments[1]), "sup")
+	} else {
+		useDisk = false
+	}
 
 	// reads YAML file and extract information
 	c, err := config.ReadConf("config.yaml")
