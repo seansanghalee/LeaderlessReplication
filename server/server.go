@@ -6,7 +6,6 @@ import (
 	"LeaderlessReplication/receiver"
 	"LeaderlessReplication/sender"
 	"LeaderlessReplication/utils"
-
 	"fmt"
 	"log"
 	"net"
@@ -71,15 +70,14 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 			if useDisk {
 				hasKey, returnedValue := utils.ReadFromFile(serverID, d.Key)
 				if hasKey {
-					ackArray = append(ackArray, returnedValue)
+					ackArray.a = append(ackArray.a, returnedValue)
 				}
 			} else {
-				index := contains(storage, d.Key)
+				index := contains(storage.s, d.Key)
 				if index >= 0 {
-					ackArray = append(ackArray, storage[index])
+					ackArray.a = append(ackArray.a, storage.s[index])
 				}
 			}
-			
 
 			for len(ackArray.a) < allowedFailures-1 {
 			}
@@ -124,17 +122,17 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 				storage.mu.Lock()
 				storage.s = append(storage.s, d)
 				storage.mu.Unlock()
-			if useDisk {
-				utils.WriteToFile(serverID, d)
-			} else {
-				index := contains(storage, d.Key)
-				if index >= 0 {
-					storage[index] = d
+				if useDisk {
+					utils.WriteToFile(serverID, d)
 				} else {
-					storage = append(storage, d)
+					index := contains(storage.s, d.Key)
+					if index >= 0 {
+						storage.s[index] = d
+					} else {
+						storage.s = append(storage.s, d)
+					}
 				}
 			}
-		}
 
 			// send all the other servers that we want to write this key-value pair
 			sendToOtherServers(d, nodes)
@@ -184,31 +182,28 @@ func listenToOtherServers(c net.Conn) {
 		case 0: // reading
 			//check if you have k,v pair in storage
 			//if you have it, send it back
-<<<<<<< HEAD
 			if contains(storage.s, d.Key) >= 0 {
-=======
-			var fileContainsKey bool
+				var fileContainsKey bool
 
-			if useDisk {
-				fileContainsKey, _ = utils.ReadFromFile(serverID, d.Key)
-			}
+				if useDisk {
+					fileContainsKey, _ = utils.ReadFromFile(serverID, d.Key)
+				}
 
-			if contains(storage, d.Key) >= 0 || fileContainsKey {
->>>>>>> d54a1c89fd08ac664a0c82c3a767adeb7f9e76ed
-				d.ReadOrWrite = -1
-				d.Ack = 1
-				d.Exists = 1
-				sender.UnicastSend(c, d)
-			} else {
-				d := data.Data{}
-				d.Ack = 1
-				d.Exists = 0
-				d.ReadOrWrite = -1
-				sender.UnicastSend(c, d)
+				if contains(storage.s, d.Key) >= 0 || fileContainsKey {
+					d.ReadOrWrite = -1
+					d.Ack = 1
+					d.Exists = 1
+					sender.UnicastSend(c, d)
+				} else {
+					d := data.Data{}
+					d.Ack = 1
+					d.Exists = 0
+					d.ReadOrWrite = -1
+					sender.UnicastSend(c, d)
+				}
 			}
 
 		case 1: // writing
-<<<<<<< HEAD
 			index := contains(storage.s, d.Key)
 			if index >= 0 {
 				storage.mu.Lock()
@@ -218,22 +213,21 @@ func listenToOtherServers(c net.Conn) {
 				storage.mu.Lock()
 				storage.s = append(storage.s, d)
 				storage.mu.Unlock()
-=======
-			if useDisk {
-				utils.WriteToFile(serverID, d)
-			} else {
-				index := contains(storage, d.Key)
-				if index >= 0 {
-					storage[index] = d
+				if useDisk {
+					utils.WriteToFile(serverID, d)
 				} else {
-					storage = append(storage, d)
+					index := contains(storage.s, d.Key)
+					if index >= 0 {
+						storage.s[index] = d
+					} else {
+						storage.s = append(storage.s, d)
+					}
 				}
->>>>>>> d54a1c89fd08ac664a0c82c3a767adeb7f9e76ed
+				// fmt.Println(storage)
+				d.ReadOrWrite = -1
+				d.Ack = 1
+				sender.UnicastSend(c, d)
 			}
-			// fmt.Println(storage)
-			d.ReadOrWrite = -1
-			d.Ack = 1
-			sender.UnicastSend(c, d)
 
 		default:
 			d.ReadOrWrite = -1
