@@ -41,7 +41,7 @@ func WriteToFile(server string, data data.Data) {
 			f.Truncate(0)
 
 			//write new content without the key to file
-			if _, err = f.WriteString(result + "\n"); err != nil {
+			if _, err = f.WriteString(result); err != nil {
 				panic(err)
 			}
 		}
