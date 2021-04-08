@@ -5,6 +5,8 @@ import (
 	"LeaderlessReplication/data"
 	"LeaderlessReplication/receiver"
 	"LeaderlessReplication/sender"
+	"LeaderlessReplication/utils"
+	"time"
 
 	"fmt"
 	"log"
@@ -199,7 +201,7 @@ func main() {
 		useDisk = true
 
 		// For Testing:
-		// utils.WriteToFile(string(arguments[1]), "sup", "peace")
+		// utils.WriteToFile(string(arguments[1]), data.Data{Key: "sup", Value: "bye", Timestamp: time.Now()})
 		// utils.ReadFromFile(string(arguments[1]), "sup")
 	} else {
 		useDisk = false
