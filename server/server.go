@@ -34,12 +34,12 @@ var useDisk bool
 var serverID string
 
 func printServers(nodes map[string]net.Conn) {
-	fmt.Println("Connected Servers:", len(nodes))
-	fmt.Println("Servers:")
+	fmt.Println("----- Connected Servers:", len(nodes), "-----")
 	for key, value := range nodes {
 		fmt.Println("ID:", key)
 		fmt.Println("Address:", value)
 	}
+	fmt.Println("--------------------------------")
 }
 
 func sendToOtherServers(d data.Data, nodes map[string]net.Conn) {
@@ -53,8 +53,10 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 		ackArray.a = nil
 		d := data.Data{}
 		receiver.UnicastReceive(c, &d)
+		fmt.Println("Data received from client")
 		switch d.ReadOrWrite {
 		case 0: //client is reading
+			fmt.Println("Client wants to Read")
 			// send all the other servers that we want to read this key
 			sendToOtherServers(d, nodes)
 
@@ -90,7 +92,7 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 				}
 			}
 
-			if counter < allowedFailures {
+			if counter < allowedFailures-1 {
 				//notify the client that the provided key does not exist
 				d.Ack = 0
 				sender.UnicastSend(c, d)
@@ -112,6 +114,7 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 			sender.UnicastSend(c, d)
 
 		case 1: //client is writing
+			fmt.Println("Client wants to Write")
 			// write to this server
 			index := contains(storage.s, d.Key)
 			if index >= 0 {
@@ -165,7 +168,7 @@ func contains(s []data.Data, str string) int {
 	return -1
 }
 
-func listenToOtherServers(c net.Conn) {
+func listenToOtherServers(c net.Conn) { // pass through nodes data struct and send appropriate data (ACK) to the specific channel
 	for {
 		d := data.Data{}
 		receiver.UnicastReceive(c, &d)
@@ -237,7 +240,7 @@ func listenToOtherServers(c net.Conn) {
 }
 
 func main() {
-	arguments := os.Args // takes in the command argument and identify the ID and the port number
+	arguments := os.Args // takes in the command argument (ID, disk flag) and identify the port number
 
 	// checks if host address and port # are provided
 	if len(arguments) == 1 {
@@ -283,12 +286,12 @@ func main() {
 
 	// TODO - goroutine to always listen to the incoming dial, connect whenever
 	for i := ID + 1; i < c.NumServers; i++ {
-		fmt.Println("Listening for server", i, "| Port", c.Servers[i].Port)
+		fmt.Println("Listening for Server", i, "on Port", c.Servers[i].Port)
 		receiver.ServerListen(port, nodes)
 	}
 
 	for i := 0; i < ID; i++ {
-		fmt.Println("Dialing server:", i)
+		fmt.Println("Dialing Server", i)
 		sender.Dial(i, ID, c.Servers[i].IP, c.Servers[i].Port, nodes)
 	}
 
@@ -315,6 +318,7 @@ func main() {
 		fmt.Println("Client connected")
 
 		go serve(c, nodes)
-		fmt.Println("Serving client")
+		fmt.Println("Serving client on address", c)
+		fmt.Println("--------------------------------")
 	}
 }

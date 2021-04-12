@@ -18,7 +18,7 @@ import (
 
 // printInterface shows the user all the available options they can execute
 func printInterface() {
-	fmt.Println("------TsengchroDB------")
+	fmt.Println("----- TsengchroDB -----")
 	fmt.Println("1. Read from the server")
 	fmt.Println("2. Write to the server")
 	fmt.Println("3. Workload Generator")
@@ -44,16 +44,12 @@ func workloadGenerator(c net.Conn) {
 
 	write := func(key string, value string) {
 		d := data.Data{}
-		// populates Data struct
 		d.Key = key
 		d.Value = value
 		d.Timestamp = time.Now()
 		d.ReadOrWrite = 1
-
-		//send struct to server
 		sender.UnicastSend(c, d)
 
-		//wait for ack
 		receiver.UnicastReceive(c, &d)
 		if d.Ack == 1 {
 			fmt.Println("Wrote: <", d.Key, ",", d.Value, "> ")
@@ -73,10 +69,10 @@ func workloadGenerator(c net.Conn) {
 
 		switch option {
 		case 0:
-			fmt.Println("--------Round", i, ": Reading", "----------")
+			fmt.Println("----- Round", i, ": Reading", "-----")
 			read(key)
 		default:
-			fmt.Println("--------Round", i, ": Writing", "----------")
+			fmt.Println("----- Round", i, ": Writing", "-----")
 			write(key, value)
 		}
 	}
@@ -114,6 +110,7 @@ func main() {
 		switch input {
 
 		case "1": //reading
+			fmt.Println("------- Reading -------")
 			d := data.Data{}
 
 			fmt.Print("Enter Key: ")
@@ -134,6 +131,7 @@ func main() {
 			}
 
 		case "2": //writing
+			fmt.Println("------- Writing -------")
 			d := data.Data{}
 
 			fmt.Print("Enter Key: ")
@@ -163,9 +161,9 @@ func main() {
 			}
 
 		case "3":
-			fmt.Println("----------Starting Generator----------")
+			fmt.Println("----- Starting Generator -----")
 			workloadGenerator(c)
-			fmt.Println("----------Generator Complete----------")
+			fmt.Println("----- Generator Complete -----")
 
 		case "4":
 			fmt.Println("Bye, bye!")
