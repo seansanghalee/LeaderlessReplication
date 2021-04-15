@@ -50,11 +50,12 @@ func sendToOtherServers(d data.Data, nodes map[string]net.Conn) {
 
 func serve(c net.Conn, nodes map[string]net.Conn) {
 	for {
-		ackArray.a = nil
 		d := data.Data{}
 		receiver.UnicastReceive(c, &d)
 		fmt.Println("Data received from client")
+		fmt.Println("Data received is: <", d.Key, ",", d.Value, ">")
 		switch d.ReadOrWrite {
+
 		case 0: //client is reading
 			fmt.Println("Client wants to Read")
 			// send all the other servers that we want to read this key
@@ -62,37 +63,50 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 
 			// waits for N - f acks
 			// adds the current server's key-value pair to compare
-			index := contains(storage.s, d.Key)
-			if index >= 0 {
-				ackArray.mu.Lock()
-				ackArray.a = append(ackArray.a, storage.s[index])
-				ackArray.mu.Unlock()
-			}
+			ackArray.a = nil
 
 			if useDisk {
 				hasKey, returnedValue := utils.ReadFromFile(serverID, d.Key)
 				if hasKey {
+					d.Exists = 1
 					ackArray.a = append(ackArray.a, returnedValue)
+				} else {
+					d.Exists = 0
+					ackArray.a = append(ackArray.a, d)
 				}
 			} else {
 				index := contains(storage.s, d.Key)
+				fmt.Println("Index:", index)
 				if index >= 0 {
+					storage.s[index].Exists = 1
+					ackArray.mu.Lock()
 					ackArray.a = append(ackArray.a, storage.s[index])
+					ackArray.mu.Unlock()
+				} else {
+					d.Exists = 0
+					ackArray.mu.Lock()
+					ackArray.a = append(ackArray.a, d)
+					ackArray.mu.Unlock()
 				}
+				fmt.Println("Exists:", d.Exists)
+			}
+			fmt.Println("Before:", ackArray.a)
+			for len(ackArray.a) < allowedFailures {
 			}
 
-			for len(ackArray.a) < allowedFailures-1 {
-			}
+			fmt.Println("After:", ackArray.a)
 
 			var counter int
 
 			for i := range ackArray.a {
+				fmt.Println(i)
 				if ackArray.a[i].Exists == 1 {
 					counter += 1
 				}
 			}
+			fmt.Println("Counter: ", counter)
 
-			if counter < allowedFailures-1 {
+			if counter < allowedFailures {
 				//notify the client that the provided key does not exist
 				d.Ack = 0
 				sender.UnicastSend(c, d)
@@ -116,44 +130,62 @@ func serve(c net.Conn, nodes map[string]net.Conn) {
 		case 1: //client is writing
 			fmt.Println("Client wants to Write")
 			// write to this server
+			if useDisk {
+				utils.WriteToFile(serverID, d)
+			}
+
+			//write to disk also for calculation stuff
 			index := contains(storage.s, d.Key)
 			if index >= 0 {
 				storage.mu.Lock()
 				storage.s[index] = d
 				storage.mu.Unlock()
 			} else {
+				d.Exists = 1
 				storage.mu.Lock()
 				storage.s = append(storage.s, d)
 				storage.mu.Unlock()
-				if useDisk {
-					utils.WriteToFile(serverID, d)
-				} else {
-					index := contains(storage.s, d.Key)
-					if index >= 0 {
-						storage.s[index] = d
-					} else {
-						storage.s = append(storage.s, d)
-					}
-				}
+				d.Exists = 0
 			}
-
+			fmt.Println("Storage:", storage.s)
 			// send all the other servers that we want to write this key-value pair
 			sendToOtherServers(d, nodes)
 
-			// waits for N - f acks
+			fmt.Println("Data sent to other servers")
 
-			for len(ackArray.a) < allowedFailures-1 {
+			d.Ack = 1
+			d.Exists = 1
+			ackArray.mu.Lock()
+			ackArray.a = append(ackArray.a, d)
+			ackArray.mu.Unlock()
+
+			// waits for N - f acks
+			for len(ackArray.a) < allowedFailures {
 			}
 
-			if len(ackArray.a)+1 < allowedFailures {
+			fmt.Println(ackArray.a)
+
+			var counter int
+			for i := range ackArray.a {
+				fmt.Println(i)
+				if ackArray.a[i].Ack == 1 {
+					counter += 1
+				}
+			}
+			fmt.Println("Counter: ", counter)
+
+			if counter < allowedFailures {
+				//notify the client that the key value pair wasn't written
 				d.Ack = 0
-			} else {
-				d.Ack = 1
+				sender.UnicastSend(c, d)
+				break
 			}
 			// sends ack back to the client
+			d.Ack = 1
 			sender.UnicastSend(c, d)
 		default:
-			sender.UnicastSend(c, d)
+			fmt.Println("Unreachable")
+			// sender.UnicastSend(c, d)
 		}
 	}
 }
@@ -172,9 +204,9 @@ func listenToOtherServers(c net.Conn) { // pass through nodes data struct and se
 	for {
 		d := data.Data{}
 		receiver.UnicastReceive(c, &d)
+		fmt.Println("Data received")
 
 		if d.Ack == 1 {
-			d.ReadOrWrite = -1
 			ackArray.mu.Lock()
 			ackArray.a = append(ackArray.a, d)
 			ackArray.mu.Unlock()
@@ -183,30 +215,67 @@ func listenToOtherServers(c net.Conn) { // pass through nodes data struct and se
 
 		switch d.ReadOrWrite {
 		case 0: // reading
+			fmt.Println("Received a read request")
 			//check if you have k,v pair in storage
 			//if you have it, send it back
-			if contains(storage.s, d.Key) >= 0 {
-				var fileContainsKey bool
+			var fileContainsKey bool
 
-				if useDisk {
-					fileContainsKey, _ = utils.ReadFromFile(serverID, d.Key)
-				}
+			if useDisk {
+				fileContainsKey, _ = utils.ReadFromFile(serverID, d.Key)
 
-				if contains(storage.s, d.Key) >= 0 || fileContainsKey {
-					d.ReadOrWrite = -1
+				if fileContainsKey {
+					// d = data in this server's storage
 					d.Ack = 1
 					d.Exists = 1
 					sender.UnicastSend(c, d)
 				} else {
-					d := data.Data{}
 					d.Ack = 1
 					d.Exists = 0
-					d.ReadOrWrite = -1
+					sender.UnicastSend(c, d)
+				}
+			} else {
+				index := contains(storage.s, d.Key)
+				fmt.Println("Index:", index)
+				if index >= 0 {
+					d = storage.s[index]
+					d.Ack = 1
+					d.Exists = 1
+					sender.UnicastSend(c, d)
+				} else {
+					d.Ack = 1
+					d.Exists = 0
 					sender.UnicastSend(c, d)
 				}
 			}
+			fmt.Println("Response sent with Ack:", d.Ack)
+			/*
+				if contains(storage.s, d.Key) >= 0 {
+					var fileContainsKey bool
+
+					if useDisk {
+					}
+
+					if fileContainsKey {
+						// d.ReadOrWrite = -1
+						d.Ack = 1
+						d.Exists = 1
+						sender.UnicastSend(c, d)
+					} else {
+						d := data.Data{}
+						d.Ack = 1
+						d.Exists = 0
+						// d.ReadOrWrite = -1
+						sender.UnicastSend(c, d)
+					}
+				} else {
+					d.Ack = 1
+					d.Exists = 0
+					sender.UnicastSend(c, d)
+				}
+			*/
 
 		case 1: // writing
+			fmt.Println("Received a write request")
 			index := contains(storage.s, d.Key)
 			if index >= 0 {
 				storage.mu.Lock()
@@ -218,23 +287,26 @@ func listenToOtherServers(c net.Conn) { // pass through nodes data struct and se
 				storage.mu.Unlock()
 				if useDisk {
 					utils.WriteToFile(serverID, d)
-				} else {
-					index := contains(storage.s, d.Key)
-					if index >= 0 {
-						storage.s[index] = d
-					} else {
-						storage.s = append(storage.s, d)
-					}
 				}
+				// } else {
+				// 	index := contains(storage.s, d.Key)
+				// 	if index >= 0 {
+				// 		storage.s[index] = d
+				// 	} else {
+				// 		storage.s = append(storage.s, d)
+				// 	}
+				// }
 				// fmt.Println(storage)
-				d.ReadOrWrite = -1
-				d.Ack = 1
-				sender.UnicastSend(c, d)
+				// d.ReadOrWrite = -1
+
 			}
+			d.Ack = 1
+			sender.UnicastSend(c, d)
+
+			fmt.Println("Response sent with Ack:", d.Ack)
 
 		default:
-			d.ReadOrWrite = -1
-			sender.UnicastSend(c, d)
+			fmt.Println("Unreachable")
 		}
 	}
 }
@@ -281,10 +353,11 @@ func main() {
 
 	fmt.Println("ID: ", ID)
 
-	allowedFailures = c.NumServers - c.NumFailures //sets N-f
+	allowedFailures = c.NumServers - c.NumFailures // sets N-f
 	nodes := make(map[string]net.Conn)             // tracks server ID and InetAddress
 
 	// TODO - goroutine to always listen to the incoming dial, connect whenever
+
 	for i := ID + 1; i < c.NumServers; i++ {
 		fmt.Println("Listening for Server", i, "on Port", c.Servers[i].Port)
 		receiver.ServerListen(port, nodes)

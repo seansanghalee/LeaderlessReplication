@@ -150,7 +150,7 @@ func main() {
 
 			//send struct to server
 			sender.UnicastSend(c, d)
-			fmt.Println("Key/Value sent")
+			fmt.Println("Key/Value: <", d.Key, ",", d.Value, ">", "sent.")
 
 			//wait for ack
 			receiver.UnicastReceive(c, &d)
