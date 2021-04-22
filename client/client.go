@@ -81,18 +81,25 @@ func workloadGenerator(c net.Conn) {
 
 func main() {
 	// reads YAML file and extracts information
-	yaml, err := config.ReadConf("config.yaml")
+	_, err := config.ReadConf("config.yaml")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// dials the appropriate server: currently random
-	rand.Seed(time.Now().UnixNano())
-	toDial := rand.Intn(yaml.NumServers - 0)
-	IP := yaml.Servers[toDial].IP
-	port := yaml.Servers[toDial].Port
+	// contacts load balancer and receives a ip/port
 
-	c, err := net.Dial("tcp", IP+":"+port)
+	conn, err := net.Dial("tcp", "127.0.0.1:8081")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	connectionString, _ := bufio.NewReader(conn).ReadString('\n')
+	connectionString = strings.TrimSuffix(connectionString, "\n")
+	// fmt.Print(connectionString)
+
+	//connect to server
+	c, err := net.Dial("tcp", connectionString)
 	if err != nil {
 		fmt.Println(err)
 		return
