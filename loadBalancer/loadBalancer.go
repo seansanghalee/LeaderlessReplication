@@ -2,10 +2,16 @@ package main
 
 import (
 	"LeaderlessReplication/config"
+	"LeaderlessReplication/utils"
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"strconv"
 	"sync"
+	"time"
+
+	"github.com/go-co-op/gocron"
 )
 
 var (
@@ -84,33 +90,30 @@ func getServer() config.Server {
 }
 
 func healthCheck(servers []config.Server) {
-	fmt.Println("Health check called")
+	s := gocron.NewScheduler(time.Local)
+	l := log.New(os.Stdout, "", 0)
 
-	for server := range servers {
-		health := checkHealth(servers[server])
+	_, err := s.Every(2).Seconds().Do(func() {
+		for server := range servers {
+			health := checkHealth(servers[server])
 
-		fmt.Println(health)
+			utils.Log(l, strconv.Itoa(serverList[server].ID)+" is "+health)
 
-		if health == "healthy" {
-			serverList[server].Alive = true
-		} else {
-			serverList[server].Alive = false
+			if health == "healthy" {
+				serverList[server].Alive = true
+			} else {
+				serverList[server].Alive = false
+			}
+
 		}
+		fmt.Println("-------------------------------------------")
+	})
 
-		fmt.Println(serverList)
-
+	if err != nil {
+		log.Fatalln(err)
 	}
 
-	// s := gocron.NewScheduler(time.Local)
-
-	// _, err := s.Every(2).Seconds().Do(func() {
-	// 	healthy := checkHealth()
-	// 	fmt.Println(healthy)
-	// })
-
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
+	s.StartAsync()
 }
 
 func checkHealth(server config.Server) string {

@@ -98,3 +98,7 @@ func StrToInt(str string) (int, error) {
 	return strconv.Atoi(nonFractionalPart[0])
 }
 
+func Log(l *log.Logger, msg string) {
+    l.SetPrefix(time.Now().Format("2006-01-02 15:04:05") + " [Server] ")
+    l.Print(msg)
+}
