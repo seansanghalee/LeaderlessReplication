@@ -33,6 +33,8 @@ func main() {
 		log.Println("Error listening on port:", err)
 	}
 
+	healthCheck(serverList)
+
 	for {
 		// accept connection on port
 		conn, err := ln.Accept()
@@ -42,6 +44,7 @@ func main() {
 
 		go handleRequest(conn)
 	}
+
 }
 
 func handleRequest(conn net.Conn) {
@@ -53,9 +56,67 @@ func handleRequest(conn net.Conn) {
 
 func getServer() config.Server {
 	mutex.Lock()
+
+	currIndex := lastServedIndex
 	nextIndex := (lastServedIndex + 1) % len(serverList)
 	server := serverList[nextIndex]
 	lastServedIndex = nextIndex
+
+	for {
+		if (currIndex == nextIndex) || server.Alive {
+			break
+		}
+		nextIndex = (lastServedIndex + 1) % len(serverList)
+		server = serverList[nextIndex]
+		lastServedIndex = nextIndex
+	}
+
+	if currIndex == nextIndex {
+		fmt.Println("No avaliable servers")
+
+	} else {
+		return server
+	}
+
 	mutex.Unlock()
-	return server
+	return server //TODO: figure out how to handle return when no avaliable servers
+
+}
+
+func healthCheck(servers []config.Server) {
+	fmt.Println("Health check called")
+
+	for server := range servers {
+		health := checkHealth(servers[server])
+
+		fmt.Println(health)
+
+		if health == "healthy" {
+			serverList[server].Alive = true
+		} else {
+			serverList[server].Alive = false
+		}
+
+		fmt.Println(serverList)
+
+	}
+
+	// s := gocron.NewScheduler(time.Local)
+
+	// _, err := s.Every(2).Seconds().Do(func() {
+	// 	healthy := checkHealth()
+	// 	fmt.Println(healthy)
+	// })
+
+	// if err != nil {
+	// 	log.Fatalln(err)
+	// }
+}
+
+func checkHealth(server config.Server) string {
+	_, err := net.Dial("tcp", server.IP+":"+server.Port)
+	if err != nil {
+		return "unhealthy"
+	}
+	return "healthy"
 }

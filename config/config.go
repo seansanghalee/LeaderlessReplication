@@ -17,6 +17,7 @@ type Server struct {
 	ID   int
 	IP   string
 	Port string
+	Alive bool
 }
 
 func ReadConf(filename string) (*Config, error) {
